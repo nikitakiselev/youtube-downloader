@@ -43,7 +43,7 @@ jobs:
           pip install -U "yt-dlp[default,curl-cffi]" bgutil-ytdlp-pot-provider
       - name: Download
         env:
-          YTDLP_ARGS: --extractor-args youtube:player_client=mweb,default --retries 10 --extractor-retries 5 --sleep-subtitles 5
+          YTDLP_ARGS: --extractor-args youtube:player_client=default,mweb,web_safari,web_embedded,tv --retries 10 --extractor-retries 5 --sleep-subtitles 5
           X264_PRESET: veryfast
         run: ./download.sh ${{ inputs.soft && '--soft' || '' }} -q "${{ inputs.quality || '1080' }}" -o out "$URL"
       - uses: actions/upload-artifact@v4
