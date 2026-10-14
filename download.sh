@@ -9,6 +9,10 @@
 #   -o ПАПКА      куда сохранить результат (по умолчанию текущая папка)
 #   -l ЯЗЫК       язык субтитров (по умолчанию ru)
 #   -c ФАЙЛ       cookies.txt, если YouTube просит подтвердить, что вы не бот
+#   -q ВЫСОТА     максимальное качество по вертикали (по умолчанию 1080)
+#
+# Дополнительные аргументы для yt-dlp можно передать через переменную YTDLP_ARGS,
+# пресет x264 для вшивания субтитров — через X264_PRESET (по умолчанию medium).
 #
 # Нужны: yt-dlp, ffmpeg (с libass) и, желательно, deno (для JS-проверок YouTube).
 set -euo pipefail
@@ -16,9 +20,11 @@ set -euo pipefail
 mode=burn
 outdir=.
 lang=ru
+height=1080
 cookies=()
+read -r -a extra <<< "${YTDLP_ARGS:-}"
 
-usage() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
+usage() { sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -26,6 +32,7 @@ while [[ $# -gt 0 ]]; do
     -o) outdir=$2; shift 2 ;;
     -l) lang=$2; shift 2 ;;
     -c) cookies=(--cookies "$2"); shift 2 ;;
+    -q) height=$2; shift 2 ;;
     -h|--help) usage ;;
     -*) echo "Неизвестный параметр: $1" >&2; usage 1 ;;
     *) url=$1; shift ;;
@@ -45,8 +52,9 @@ trap 'rm -rf "$work"' EXIT
 # Видео + оригинальная аудиодорожка (у видео с несколькими озвучками
 # оригинальная помечена "original"), субтитры: ручные, а если их нет —
 # автоматические (в т.ч. автоперевод YouTube).
-yt-dlp "${cookies[@]}" \
-  -f "bv*+ba[format_note*=original]/bv*+ba/b" \
+h="[height<=$height]"
+yt-dlp ${cookies[@]+"${cookies[@]}"} ${extra[@]+"${extra[@]}"} \
+  -f "bv*$h+ba[format_note*=original]/bv*$h+ba/b$h/b" \
   --merge-output-format mkv \
   --write-subs --write-auto-subs \
   --sub-langs "$lang" --sub-format "srt/vtt/best" --convert-subs srt \
@@ -68,7 +76,7 @@ if [[ $mode == burn ]]; then
   (cd "$work" && ffmpeg -hide_banner -y -i "$video" \
     -map 0:v:0 -map 0:a:0 \
     -vf "subtitles=subs.srt" \
-    -c:v libx264 -preset medium -crf 20 -pix_fmt yuv420p \
+    -c:v libx264 -preset "${X264_PRESET:-medium}" -crf 20 -pix_fmt yuv420p \
     -c:a aac -b:a 192k -movflags +faststart \
     "$out")
 else
